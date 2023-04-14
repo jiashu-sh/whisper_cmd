@@ -6,4 +6,8 @@ SST - Speech to Text (Chinese)
 以下为运行效果（还包括了个在线翻译的，效果不好，但也未删除）：
 ![Image text](https://github.com/jiashu-sh/whisper_cmd/blob/main/docs/whispercmd-01.png?raw=true)
 
-谢谢。
+视频演示见：
+
+[我的B站]（https://www.bilibili.com/video/BV1U84y1T7oP/?spm_id_from=333.999.0.0&vd_source=4d1c50aefebc3049c1aab4af0be6b6d6）\
+
+本人代码水平不行，仅仅是能让它跑起来，见谅。
