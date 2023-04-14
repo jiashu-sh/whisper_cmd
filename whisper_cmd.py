@@ -3,8 +3,12 @@ import wave
 import pyaudio
 import time
 import datetime
+# 配置文件的包
+import configparser
 # 使用pynput捕捉键盘鼠标事件hook
 from pynput import keyboard
+# 微软翻译的包
+import requests, uuid, json
 
 import whisper
 from zhconv import convert # 中文简繁体转换
@@ -38,6 +42,52 @@ t_clock_loading_model = time.time()
 model = whisper.load_model("medium") # 增加参数 ,"cpu",None,True 好像还是有错误 def load_model(name: str, device: Optional[Union[str, torch.device]] = None, download_root: str = None, in_memory: bool = False) 
 t_rec = round((time.time() - t_clock_loading_model),2)
 print("load whisper model elapsed {0} sec".format(t_rec))
+
+#调用微软翻译中翻英
+def translate_ms(transText,langFrom="zh-Hans",langTo="en",IsDebug = False):
+    trans_return = ""
+    # 读取ini配置文件
+    cf=configparser.ConfigParser()   #创建对象
+    cf.read('./config.ini',encoding='UTF-8') 
+    # lstCfg = cf.items("TranslatorConf")
+    config_key = cf.get('TranslatorConf','key')
+    config_region = cf.get('TranslatorConf','location')
+    
+    # Add your key and endpoint # API访问端点
+    key = config_key #"<your-translator-key>"
+    endpoint = "https://api.cognitive.microsofttranslator.com" #"https://api.cognitive.microsofttranslator.com"
+
+    # location, also known as region.
+    # required if you're using a multi-service or regional (not global) resource. It can be found in the Azure portal on the Keys and Endpoint page.
+    location = config_region # "<YOUR-RESOURCE-LOCATION>"
+
+    path = '/translate' # Api访问路径。
+    constructed_url = endpoint + path #使用方法：API访问端点+Api访问路径
+
+    params = {
+        'api-version': '3.0',
+        'from': langFrom, # 从英文翻译
+        'to': [langTo] # ['zh-Hans', 'ja'] # 翻译到中文简体，日文（可支持多个）
+    }
+
+    headers = {
+        'Ocp-Apim-Subscription-Key': key,
+        # location required if you're using a multi-service or regional (not global) resource.
+        'Ocp-Apim-Subscription-Region': location,
+        'Content-type': 'application/json',
+        'X-ClientTraceId': str(uuid.uuid4())
+    }
+
+    # You can pass more than one object in body.# 要翻译的文本
+    body = [{
+        'text': transText
+    }]
+
+    request = requests.post(constructed_url, params=params, headers=headers, json=body)
+    response = request.json()
+    trans_return = response
+    
+    return trans_return
 
 #调用有道翻译中翻英
 def translate(data,IsDebug = False):
@@ -152,7 +202,7 @@ def speechToText(fileName,IsDebug = False) :
         print(result.text)
     return(zh_result)
 
-def showContentWindow(sttContent,splitedContent=""):
+def showContentWindow(sttContent,sContent=""):
     # 弹出录音内容窗口
     # 定义一个窗体
     mainwin = tkinter.Tk()
@@ -192,7 +242,7 @@ def showContentWindow(sttContent,splitedContent=""):
     text_content.pack(fill=tkinter.X,expand=False,side=tkinter.TOP,anchor=tkinter.N)
     text_content.insert("insert",txt_content)
     
-    txt_splited_content = splitedContent
+    txt_splited_content = sContent
     text_content_split = tkinter.Text(frame2,width=50,height=100, font=("宋体", 12, "normal"),bg='#CCFFCC') #, tkinter.Entry(show='',  bg='white', highlightcolor='blue', relief='raised',width=60,textvariable=txt_content）
     text_content_split.pack(fill=tkinter.X,expand=False,side=tkinter.TOP,anchor=tkinter.N)
     text_content_split.insert("insert",txt_splited_content)
@@ -214,6 +264,16 @@ def showContentWindow(sttContent,splitedContent=""):
 
 
 if __name__ == "__main__" :
+    
+    # 读取ini配置文件
+    cf=configparser.ConfigParser()   #创建对象
+    cf.read('./config.ini',encoding='UTF-8') 
+    # lstCfg = cf.items("TranslatorConf")
+    print(cf.get('TranslatorConf','key'))
+    print(cf.get('TranslatorConf','location'))
+    print(cf.get('TranslatorConf','language1'))
+    print(cf.get('TranslatorConf','language2'))
+
     # python whisper_cmd.py showin:false    -- 使用这个启动，直接把语音内容复制到剪贴板，并粘贴到当前窗口
     # python whisper_cmd.py                 -- 不带参数，默认弹出窗口
     
@@ -247,6 +307,8 @@ if __name__ == "__main__" :
             print(sPara)
             if sPara == "translate:on" :
                 bTranslate = True
+            elif sPara == "translate:off" :
+                bTranslate = False
             elif sPara == "showin:on" :
                 bShowContentWindow = True
             elif sPara == "showin:off" :
@@ -319,7 +381,7 @@ if __name__ == "__main__" :
             print(txt)
             
             if bTranslate: #若需要翻译  则增加开关 translate:true
-                str_en = translate(str(txt))
+                str_en = translate_ms(str(txt))
                 print(str_en)
                 
             splited_txt = []
@@ -327,8 +389,8 @@ if __name__ == "__main__" :
                 splited_txt = jieba.lcut(txt,cut_all = True)
                 seg_list = jieba.cut(txt)
                 seg_txt = "" + "/ ".join(seg_list) 
-            if bShowContentWindow : # 弹出窗口
-                showContentWindow(txt,seg_txt)
+            if bShowContentWindow : # 弹出窗口 str_en
+                showContentWindow(txt,str_en) # showContentWindow(txt,seg_txt)
             else : # 进行拷贝粘贴
                 pc.copy(str(txt))
                 press_ctrl_v()

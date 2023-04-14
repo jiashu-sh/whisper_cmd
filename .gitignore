@@ -2,6 +2,8 @@
 *.mp3
 *.pyc
 t3.py
+t4.py
+config.ini
 rec/*
 rec/*.*
 __pycache__/*
