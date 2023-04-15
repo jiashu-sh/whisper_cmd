@@ -3,6 +3,7 @@ import wave
 import pyaudio
 import time
 import datetime
+import random
 # 配置文件的包
 import configparser
 # 使用pynput捕捉键盘鼠标事件hook
@@ -42,6 +43,31 @@ t_clock_loading_model = time.time()
 model = whisper.load_model("medium") # 增加参数 ,"cpu",None,True 好像还是有错误 def load_model(name: str, device: Optional[Union[str, torch.device]] = None, download_root: str = None, in_memory: bool = False) 
 t_rec = round((time.time() - t_clock_loading_model),2)
 print("load whisper model elapsed {0} sec".format(t_rec))
+
+#region 类转换示例
+"""
+class TranslateContent(object):
+    def __init__(self, text: str, to: str):
+        self.text = text
+        self.to = to
+    
+def json_to_translate(translateContent: dict) -> TranslateContent:
+    translateContent = TranslateContent(
+        text=translateContent['text'],
+        to=translateContent['to']
+    )
+    return translateContent
+
+# 示例
+# 预处理
+trans_str= response.strip('[]').strip('{}').replace("'translations'","").strip().strip(':').strip().strip('[]')
+trans_str = trans_return.replace("''","\"")
+
+s2= "{\"text\": \"Today unstained reaction\", \"to\": \"en\"}"
+r = json_to_translate(json.loads(s2))  
+
+"""
+#endregion
 
 #调用微软翻译中翻英
 def translate_ms(transText,langFrom="zh-Hans",langTo="en",IsDebug = False):
@@ -85,7 +111,11 @@ def translate_ms(transText,langFrom="zh-Hans",langTo="en",IsDebug = False):
 
     request = requests.post(constructed_url, params=params, headers=headers, json=body)
     response = request.json()
-    trans_return = response
+    # print(json.dumps(response, sort_keys=True, indent=4, separators=(',', ': ')))
+
+    # s.index("'translations'")
+    if ( len(response) >0 ) :
+        trans_return = response[0]["translations"][0]["text"]
     
     return trans_return
 
@@ -202,6 +232,21 @@ def speechToText(fileName,IsDebug = False) :
         print(result.text)
     return(zh_result)
 
+def isChinese(ch):
+        if '\u4e00' <= ch <= '\u9fff':
+            return True
+        return False
+    
+def isEnglish(ch):
+    if (u'\u0041' <= ch <= u'\u005a') or (u'\u0061' <= ch <= u'\u007a'):
+        return True
+    return False
+    
+def isNumber(ch):
+    if u'\u0030' <= ch <= u'\u0039':
+        return True
+    return False
+
 def showContentWindow(sttContent,sContent=""):
     # 弹出录音内容窗口
     # 定义一个窗体
@@ -241,19 +286,38 @@ def showContentWindow(sttContent,sContent=""):
     text_content = tkinter.Text(frame1,width=50,height=100, font=("宋体", 12, "normal"),bg='#FFFAF0') #, tkinter.Entry(show='',  bg='white', highlightcolor='blue', relief='raised',width=60,textvariable=txt_content）
     text_content.pack(fill=tkinter.X,expand=False,side=tkinter.TOP,anchor=tkinter.N)
     text_content.insert("insert",txt_content)
+    text_content.focus_set()
     
     txt_splited_content = sContent
     text_content_split = tkinter.Text(frame2,width=50,height=100, font=("宋体", 12, "normal"),bg='#CCFFCC') #, tkinter.Entry(show='',  bg='white', highlightcolor='blue', relief='raised',width=60,textvariable=txt_content）
     text_content_split.pack(fill=tkinter.X,expand=False,side=tkinter.TOP,anchor=tkinter.N)
     text_content_split.insert("insert",txt_splited_content)
-    text_content_split.focus_set()
+    # text_content_split.focus_set()
+    
+    
     
     def sendStr():
-        txt_get = text_content_split.get("1.0","end")
-        pc.copy(str(txt_get))
-        print('Data Send Ok!')
+        # txt_get = text_content_split.get("1.0","end")
+        # pc.copy(str(txt_get))
+        # print('Data Send Ok!')
+        txt_get = text_content.get("1.0","end")
+        ch = random.choice(txt_get) # 从字符串中随机取一个字符
+        if isNumber(ch): # 若为数字再随机取一个
+            ch = random.choice(txt_get)
+        language1 = cf.get('TranslatorConf','language1')
+        language2 = cf.get('TranslatorConf','language2')
+        langFrom = language1
+        langTo = language2
+        if not isChinese(ch):
+            langFrom = language2
+            langTo = language1
+        if bTranslate: #若需要翻译  则增加开关 translate:true
+            text_trans = translate_ms(str(txt_get),langFrom,langTo)
+            text_content_split.delete("1.0","end")
+            text_content_split.insert("insert",text_trans)
         
-    button1 = tkinter.Button(frame3,text='Copy'+'\n' + '(copy to clipboard)', width=90,height=2,font=("Arial,宋体", 9, "normal"),command=sendStr)
+        
+    button1 = tkinter.Button(frame3,text='Translate'+'\n' + '(redo-tranlate)', width=90,height=2,font=("Arial,宋体", 9, "normal"),command=sendStr)
     # button1.config()
     button1.pack(expand=True)
     
@@ -274,8 +338,8 @@ if __name__ == "__main__" :
     print(cf.get('TranslatorConf','language1'))
     print(cf.get('TranslatorConf','language2'))
 
-    # python whisper_cmd.py showin:false    -- 使用这个启动，直接把语音内容复制到剪贴板，并粘贴到当前窗口
-    # python whisper_cmd.py                 -- 不带参数，默认弹出窗口
+    # python whisper_cmd.py showin:true    -- 使用这个启动，弹出窗口
+    # python whisper_cmd.py                 -- 不带参数，默认不弹出窗口，直接把语音内容复制到剪贴板，并粘贴到当前窗口（不翻译）
     
     bTranslate = False # 是否自动翻译
     bShowContentWindow = False # 是否弹出窗口
