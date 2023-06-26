@@ -1,0 +1,1 @@
+python whisper_cmd.py translate:on showin:on
